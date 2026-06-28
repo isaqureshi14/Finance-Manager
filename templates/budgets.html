@@ -1,0 +1,200 @@
+{% extends "base.html" %}
+{% block title %}Budgets{% endblock %}
+{% block page_title %}Budgets{% endblock %}
+{% block page_subtitle %}{{ month }}/{{ year }} — track your spending limits{% endblock %}
+
+{% block head %}
+<style>
+  @keyframes pulse-red {
+    0%, 100% { opacity: 1; box-shadow: 0 0 4px rgba(244, 63, 94, 0.2); }
+    50% { opacity: 0.7; box-shadow: 0 0 14px rgba(244, 63, 94, 0.5); }
+  }
+  .pulse-red-glow {
+    animation: pulse-red 1.5s infinite ease-in-out;
+  }
+  
+  .budget-card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: start;
+    margin-bottom: 16px;
+  }
+  
+  .icon-container {
+    width: 42px;
+    height: 42px;
+    background: rgba(255,255,255,0.03);
+    border: 1px solid rgba(255,255,255,0.05);
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  body.theme-light .icon-container {
+    background: rgba(0,0,0,0.02);
+    border-color: rgba(0,0,0,0.05);
+  }
+</style>
+{% endblock %}
+
+{% block topbar_actions %}
+<button class="btn btn-primary" onclick="openModal('budget-modal')">
+  <i data-lucide="plus" style="width: 16px; height: 16px; color: #000;"></i> Set Budget
+</button>
+{% endblock %}
+
+{% block content %}
+<div id="budgets-grid" style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px;"></div>
+<div id="no-budgets" style="display: none;">
+  <div class="card" style="text-align: center; padding: 64px 32px;">
+    <div style="display: flex; justify-content: center; margin-bottom: 16px;">
+      <div style="width: 64px; height: 64px; border-radius: 50%; background: var(--accent-dim); display: flex; align-items: center; justify-content: center; border: 1px solid var(--border-active);">
+        <i data-lucide="target" style="width: 28px; height: 28px; color: var(--accent);"></i>
+      </div>
+    </div>
+    <div style="font-size: 18px; font-weight: 800; margin-bottom: 8px; color: var(--text-primary);">No budgets set</div>
+    <div style="font-size: 14px; color: var(--text-secondary); margin-bottom: 24px; max-width: 400px; margin-left: auto; margin-right: auto; line-height: 1.5;">Set spending limits by category to keep your budget healthy and monitor your savings potential.</div>
+    <button class="btn btn-primary" onclick="openModal('budget-modal')">Set First Budget</button>
+  </div>
+</div>
+
+<!-- Budget Modal -->
+<div class="modal-overlay" id="budget-modal">
+  <div class="modal">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px;">
+      <div class="modal-title">Set Budget</div>
+      <button onclick="closeModal('budget-modal')" style="background: none; border: none; color: #8899b4; font-size: 20px; cursor: pointer;">✕</button>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Category</label>
+      <select id="budget-cat" class="form-input"></select>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Monthly Limit (₹)</label>
+      <input type="number" id="budget-limit" class="form-input" placeholder="e.g. 5000" />
+    </div>
+    <div style="display: flex; gap: 12px; margin-top: 8px;">
+      <button class="btn btn-ghost" onclick="closeModal('budget-modal')" style="flex: 1;">Cancel</button>
+      <button class="btn btn-primary" onclick="saveBudget()" style="flex: 2;">Set Budget</button>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+async function loadBudgets() {
+  const [budgets, txData] = await Promise.all([
+    api('/api/budgets'),
+    api('/api/dashboard-data')
+  ]);
+
+  const cats = await api('/api/categories');
+  const expCats = cats.filter(c => c.type === 'expense');
+  const sel = document.getElementById('budget-cat');
+  sel.innerHTML = '<option value="">Select category</option>';
+  expCats.forEach(c => { sel.innerHTML += `<option value="${c.id}">${c.name}</option>`; });
+
+  const pageBudgets = budgets;
+  const spending = txData.category_spending;
+
+  const grid = document.getElementById('budgets-grid');
+  const noBudgets = document.getElementById('no-budgets');
+
+  if (pageBudgets.length === 0) {
+    grid.style.display = 'none';
+    noBudgets.style.display = 'block';
+    // Load Lucide icons for the empty state
+    lucide.createIcons();
+    return;
+  }
+  grid.style.display = 'grid';
+  noBudgets.style.display = 'none';
+
+  grid.innerHTML = pageBudgets.map(b => {
+    const spent = spending[b.category.name] || 0;
+    const pct = Math.min((spent / b.limit_amount) * 100, 100);
+    const over = spent > b.limit_amount;
+    
+    // Theme configs
+    let color = 'var(--emerald)';
+    let progressBg = 'linear-gradient(90deg, #10b981 0%, #059669 100%)';
+    let badgeClass = 'badge badge-green';
+    let borderStyle = 'style="border-color: rgba(255,255,255,0.04);"';
+    
+    if (over) {
+      color = 'var(--rose)';
+      progressBg = 'linear-gradient(90deg, #f43f5e 0%, #e11d48 100%)';
+      badgeClass = 'badge badge-red pulse-red-glow';
+      borderStyle = 'style="border-color: rgba(244,63,94,0.25);"';
+    } else if (pct > 75) {
+      color = 'var(--amber)';
+      progressBg = 'linear-gradient(90deg, #fbbf24 0%, #d97706 100%)';
+      badgeClass = 'badge badge-amber';
+      borderStyle = 'style="border-color: rgba(251,191,36,0.25);"';
+    }
+    
+    const remaining = b.limit_amount - spent;
+    const catColor = b.category.color || '#d9a05b';
+    
+    return `
+      <div class="card" ${borderStyle}>
+        <div class="budget-card-header">
+          <div style="display: flex; align-items: center; gap: 12px;">
+            <div class="icon-container" style="background: ${catColor}15; border-color: ${catColor}25;">
+              <i data-lucide="${b.category.icon || 'package'}" style="width: 18px; height: 18px; color: ${catColor};"></i>
+            </div>
+            <div>
+              <div style="font-size: 15px; font-weight: 700; color: var(--text-primary);">${b.category.name}</div>
+              <div style="font-size: 11px; color: var(--text-muted); margin-top: 1px;">Limit: ${formatINR(b.limit_amount)}</div>
+            </div>
+          </div>
+          <button onclick="deleteBudget(${b.id})" style="background: none; border: none; color: var(--text-muted); cursor: pointer; display: flex; align-items: center; justify-content: center; width: 28px; height: 28px; border-radius: 50%; transition: all 0.2s;" onmouseover="this.style.color='var(--rose)'; this.style.background='rgba(244,63,94,0.08)';" onmouseout="this.style.color='var(--text-muted)'; this.style.background='none';">
+            <i data-lucide="trash-2" style="width: 14px; height: 14px;"></i>
+          </button>
+        </div>
+        <div style="display: flex; justify-content: space-between; margin-bottom: 8px; align-items: center;">
+          <span style="font-size: 13px; color: var(--text-secondary); font-weight: 500;">Spent</span>
+          <span style="font-size: 14px; font-weight: 700; color: ${color}; font-family: 'JetBrains Mono', monospace;">${formatINR(spent)}</span>
+        </div>
+        <div class="progress-bar" style="margin-bottom: 12px; height: 7px;">
+          <div class="progress-fill" style="width: ${pct}%; background: ${progressBg};"></div>
+        </div>
+        <div style="display: flex; justify-content: space-between; align-items: center;">
+          <span class="${badgeClass}">
+            ${over ? '⚠ Over by ' + formatINR(Math.abs(remaining)) : Math.round(pct) + '% used'}
+          </span>
+          ${!over ? `<span style="font-size: 12px; color: var(--text-secondary); font-weight: 500; font-family:'JetBrains Mono',monospace;">${formatINR(remaining)} left</span>` : ''}
+        </div>
+      </div>
+    `;
+  }).join('');
+
+  // Reinitialize Lucide vector icons
+  lucide.createIcons();
+}
+
+async function saveBudget() {
+  const cat = document.getElementById('budget-cat').value;
+  const limit = document.getElementById('budget-limit').value;
+  if (!cat || !limit) { showToast('Select a category and enter a limit', 'error'); return; }
+  const res = await api('/api/budgets', 'POST', { category_id: cat, limit_amount: limit });
+  if (res.success) {
+    closeModal('budget-modal');
+    showToast('Budget set!');
+    location.reload();
+  }
+}
+
+async function deleteBudget(id) {
+  await api(`/api/budgets/${id}`, 'DELETE');
+  showToast('Budget removed', 'warning');
+  location.reload();
+}
+
+function openModal(id) { document.getElementById(id).classList.add('open'); }
+function closeModal(id) { document.getElementById(id).classList.remove('open'); }
+
+loadBudgets();
+</script>
+{% endblock %}

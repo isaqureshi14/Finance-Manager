@@ -1,0 +1,307 @@
+{% extends "base.html" %}
+{% block title %}AI Insights{% endblock %}
+{% block page_title %}AI Insights{% endblock %}
+{% block page_subtitle %}Powered by Claude — personalized for {{ user.age_group }}{% endblock %}
+
+{% block head %}
+<style>
+  .insight-btn {
+    display: flex; align-items: center; gap: 8px;
+    padding: 12px 24px; border-radius: 14px;
+    background: var(--bg-surface);
+    border: 1px solid var(--border);
+    color: var(--text-secondary); font-size: 14px; font-weight: 700;
+    cursor: pointer; transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+    font-family: 'Plus Jakarta Sans', sans-serif;
+  }
+  .insight-btn:hover { 
+    background: rgba(255,255,255,0.03); 
+    color: var(--text-primary); 
+    border-color: rgba(255,255,255,0.1);
+  }
+  body.theme-light .insight-btn:hover {
+    background: rgba(0,0,0,0.02);
+    border-color: rgba(0,0,0,0.08);
+  }
+  .insight-btn.active {
+    background: var(--accent-dim);
+    border-color: var(--border-active);
+    color: var(--accent);
+    box-shadow: 0 4px 14px var(--accent-glow);
+  }
+  
+  @keyframes pulse { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:0.6;transform:scale(1.05)} }
+  
+  .forecast-metric {
+    background: rgba(0,0,0,0.2);
+    border: 1px solid var(--border);
+    border-radius: 16px; padding: 20px;
+    text-align: center;
+    transition: transform 0.2s;
+  }
+  body.theme-light .forecast-metric {
+    background: rgba(255,255,255,0.8);
+  }
+  .forecast-metric:hover {
+    transform: translateY(-2px);
+    border-color: rgba(255,255,255,0.1);
+  }
+  body.theme-light .forecast-metric:hover {
+    border-color: rgba(0,0,0,0.12);
+  }
+  .forecast-metric .label { font-size: 10px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px; font-weight: 700; }
+  .forecast-metric .value { font-size: 24px; font-weight: 800; font-family: 'JetBrains Mono', monospace; }
+  
+  .banner-glow-card {
+    background: linear-gradient(135deg, var(--accent-dim), rgba(16, 185, 129, 0.04));
+    border-color: rgba(217, 160, 91, 0.2);
+    box-shadow: 0 4px 20px rgba(217, 160, 91, 0.05);
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+<!-- Age Group Banner -->
+<div class="card banner-glow-card" style="margin-bottom: 24px;">
+  <div style="display: flex; align-items: center; gap: 20px; flex-wrap: wrap;">
+    <div style="width: 52px; height: 52px; background: linear-gradient(135deg, var(--accent), #a16207); border-radius: 16px; display: flex; align-items: center; justify-content: center; font-size: 24px; box-shadow: 0 0 20px var(--accent-glow); color:#000;">
+      <i data-lucide="sparkles" style="width: 24px; height: 24px;"></i>
+    </div>
+    <div>
+      <div style="font-size: 16px; font-weight: 800; color: var(--text-primary);">Insights tailored for {{ user.age_group }}</div>
+      <div style="font-size: 13px; color: var(--text-secondary); margin-top: 3px; line-height: 1.4;">AI analyzes your spending patterns and gives advice relevant to your life stage and financial goals.</div>
+    </div>
+    <div style="margin-left: auto;">
+      <span class="badge badge-green">● Live Analysis</span>
+    </div>
+  </div>
+</div>
+
+<!-- Insight Type Selector -->
+<div style="display: flex; gap: 12px; margin-bottom: 24px; flex-wrap: wrap;">
+  <button class="insight-btn active" data-type="general" onclick="selectInsightType(this, 'general')">
+    <i data-lucide="zap" style="width: 16px; height: 16px;"></i> General Analysis
+  </button>
+  <button class="insight-btn" data-type="savings" onclick="selectInsightType(this, 'savings')">
+    <i data-lucide="piggy-bank" style="width: 16px; height: 16px;"></i> Savings Tips
+  </button>
+  <button class="insight-btn" data-type="forecast" onclick="selectInsightType(this, 'forecast')">
+    <i data-lucide="trending-up" style="width: 16px; height: 16px;"></i> Next Month Forecast
+  </button>
+</div>
+
+<!-- Loading State -->
+<div id="insights-loading" style="display: none;">
+  <div class="card" style="text-align: center; padding: 56px 32px;">
+    <div style="display: inline-flex; width: 64px; height: 64px; border-radius: 50%; background: var(--accent-dim); align-items: center; justify-content: center; animation: pulse 1.5s infinite; border: 1px solid var(--border-active); margin-bottom: 18px;">
+      <i data-lucide="brain" style="width: 32px; height: 32px; color: var(--accent);"></i>
+    </div>
+    <div style="font-size: 18px; font-weight: 800; margin-bottom: 8px; color: var(--text-primary);">Analyzing your finances...</div>
+    <div style="font-size: 14px; color: var(--text-secondary); max-width: 400px; margin: 0 auto; line-height: 1.5;">Claude is reviewing your transaction history, categories, and budgets to craft tailored recommendations.</div>
+  </div>
+</div>
+
+<!-- Error State -->
+<div id="insights-error" style="display: none;">
+  <div class="card" style="text-align: center; padding: 56px 32px; border-color: rgba(244,63,94,0.25);">
+    <div style="display: inline-flex; width: 64px; height: 64px; border-radius: 50%; background: rgba(244,63,94,0.1); align-items: center; justify-content: center; margin-bottom: 16px;">
+      <i data-lucide="alert-octagon" style="width: 32px; height: 32px; color: var(--rose);"></i>
+    </div>
+    <div style="font-size: 18px; font-weight: 800; margin-bottom: 8px; color: var(--text-primary);">Analysis Failed</div>
+    <div style="font-size: 14px; color: var(--text-secondary); margin-bottom: 24px;" id="error-msg">Something went wrong. Make sure your ANTHROPIC_API_KEY is set.</div>
+    <button class="btn btn-primary" onclick="loadInsights()">Try Again</button>
+  </div>
+</div>
+
+<!-- General Insights -->
+<div id="general-results" style="display: none;">
+  <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;" id="insights-grid"></div>
+</div>
+
+<!-- Savings Results -->
+<div id="savings-results" style="display: none;">
+  <div style="display: flex; flex-direction: column; gap: 16px;" id="savings-grid"></div>
+</div>
+
+<!-- Forecast Results -->
+<div id="forecast-results" style="display: none;">
+  <div id="forecast-content"></div>
+</div>
+
+<!-- Initial CTA -->
+<div id="cta-state">
+  <div class="card" style="text-align: center; padding: 64px 32px;">
+    <div style="display: inline-flex; width: 64px; height: 64px; border-radius: 50%; background: var(--accent-dim); align-items: center; justify-content: center; border: 1px solid var(--border-active); margin-bottom: 18px;">
+      <i data-lucide="search" style="width: 28px; height: 28px; color: var(--accent);"></i>
+    </div>
+    <div style="font-size: 18px; font-weight: 800; margin-bottom: 8px; color: var(--text-primary);">Ready to analyze your finances</div>
+    <div style="font-size: 14px; color: var(--text-secondary); margin-bottom: 24px; max-width: 440px; margin-left: auto; margin-right: auto; line-height: 1.5;">
+      Select an insight type above, then click below to get AI-powered financial advice personalized for your life stage and goals.
+    </div>
+    <button class="btn btn-primary" onclick="loadInsights()" style="padding: 12px 36px; font-size: 15px;">
+      Get AI Insights
+    </button>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+let currentInsightType = 'general';
+
+function selectInsightType(btn, type) {
+  document.querySelectorAll('.insight-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  currentInsightType = type;
+  // Reset display
+  document.getElementById('insights-loading').style.display = 'none';
+  document.getElementById('insights-error').style.display = 'none';
+  document.getElementById('general-results').style.display = 'none';
+  document.getElementById('savings-results').style.display = 'none';
+  document.getElementById('forecast-results').style.display = 'none';
+  document.getElementById('cta-state').style.display = 'block';
+}
+
+async function loadInsights() {
+  document.getElementById('cta-state').style.display = 'none';
+  document.getElementById('general-results').style.display = 'none';
+  document.getElementById('savings-results').style.display = 'none';
+  document.getElementById('forecast-results').style.display = 'none';
+  document.getElementById('insights-error').style.display = 'none';
+  document.getElementById('insights-loading').style.display = 'block';
+
+  try {
+    const res = await api('/api/ai-insights', 'POST', { type: currentInsightType });
+    document.getElementById('insights-loading').style.display = 'none';
+
+    if (!res.success) throw new Error(res.error || 'Unknown error');
+
+    if (currentInsightType === 'general') {
+      renderGeneral(res.data);
+    } else if (currentInsightType === 'savings') {
+      renderSavings(res.data);
+    } else if (currentInsightType === 'forecast') {
+      renderForecast(res.data);
+    }
+  } catch (err) {
+    document.getElementById('insights-loading').style.display = 'none';
+    document.getElementById('insights-error').style.display = 'block';
+    document.getElementById('error-msg').textContent = err.message || 'Something went wrong.';
+  }
+}
+
+function renderGeneral(insights) {
+  const grid = document.getElementById('insights-grid');
+  const typeConfig = {
+    warning: { cls: 'insight-warning', icon: 'alert-triangle' },
+    success: { cls: 'insight-success', icon: 'check-circle' },
+    tip:     { cls: 'insight-tip',     icon: 'help-circle' },
+    alert:   { cls: 'insight-alert',   icon: 'alert-octagon' }
+  };
+  const priorityBadge = {
+    high: { cls: 'badge-red', label: 'High Priority' },
+    medium: { cls: 'badge-amber', label: 'Medium' },
+    low: { cls: 'badge-green', label: 'Low' }
+  };
+
+  grid.innerHTML = insights.map(i => {
+    const cfg = typeConfig[i.type] || typeConfig['tip'];
+    const pri = priorityBadge[i.priority] || priorityBadge['medium'];
+    return `
+      <div class="insight-card ${cfg.cls}" style="animation: fadeIn 0.4s ease; border-color: rgba(255,255,255,0.04);">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
+          <div style="display:flex;align-items:center;gap:8px;">
+            <i data-lucide="${cfg.icon}" style="width:18px;height:18px;"></i>
+            <span style="font-size:14px;font-weight:800;color:var(--text-primary);">${i.title}</span>
+          </div>
+          <span class="badge ${pri.cls}">${pri.label}</span>
+        </div>
+        <div style="font-size:13px;color:var(--text-secondary);line-height:1.6;">${i.description}</div>
+      </div>
+    `;
+  }).join('');
+  
+  // Reinitialize Lucide vector icons
+  lucide.createIcons();
+  
+  document.getElementById('general-results').style.display = 'block';
+  document.getElementById('general-results').style.animation = 'fadeIn 0.3s ease';
+}
+
+function renderSavings(tips) {
+  const grid = document.getElementById('savings-grid');
+  grid.innerHTML = tips.map((t, i) => {
+    const borderColor = t.type === 'warning' ? 'var(--amber)' : 'var(--emerald)';
+    const iconBg = t.type === 'warning' ? 'rgba(251,191,36,0.1)' : 'rgba(16,185,129,0.1)';
+    const iconColor = t.type === 'warning' ? 'var(--amber)' : 'var(--emerald)';
+    const icon = t.type === 'warning' ? 'alert-triangle' : 'lightbulb';
+    return `
+      <div class="card" style="border-left:4px solid ${borderColor}; padding:20px 24px; border-color: rgba(255,255,255,0.04); border-left-color: ${borderColor};">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;flex-wrap:wrap;gap:8px;">
+          <div style="display:flex;align-items:center;gap:12px;">
+            <div style="width:36px;height:36px;background:${iconBg};border-radius:10px;display:flex;align-items:center;justify-content:center;color:${iconColor};">
+              <i data-lucide="${icon}" style="width:18px;height:18px;"></i>
+            </div>
+            <span style="font-size:15px;font-weight:800;color:var(--text-primary);">${t.title}</span>
+          </div>
+          ${t.potential_saving ? `<span class="badge badge-green" style="font-family:'JetBrains Mono',monospace;">Save ₹${Number(t.potential_saving).toLocaleString('en-IN')}/mo</span>` : ''}
+        </div>
+        <div style="font-size:13px;color:var(--text-secondary);line-height:1.6;padding-left:48px;">${t.description}</div>
+      </div>
+    `;
+  }).join('');
+  
+  // Reinitialize Lucide vector icons
+  lucide.createIcons();
+  
+  document.getElementById('savings-results').style.display = 'block';
+}
+
+function renderForecast(f) {
+  const outlookConfig = {
+    positive: { color: 'var(--emerald)', icon: 'trending-up', label: 'Positive', bg: 'rgba(16,185,129,0.1)' },
+    neutral:  { color: 'var(--amber)', icon: 'bar-chart-2', label: 'Neutral', bg: 'rgba(251,191,36,0.1)' },
+    concerning: { color: 'var(--rose)', icon: 'trending-down', label: 'Concerning', bg: 'rgba(244,63,94,0.1)' }
+  };
+  const out = outlookConfig[f.outlook] || outlookConfig['neutral'];
+
+  document.getElementById('forecast-content').innerHTML = `
+    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:20px;margin-bottom:24px;">
+      <div class="forecast-metric">
+        <div class="label">Predicted Income</div>
+        <div class="value" style="color:var(--cyan);">₹${Number(f.predicted_income).toLocaleString('en-IN')}</div>
+      </div>
+      <div class="forecast-metric">
+        <div class="label">Predicted Expenses</div>
+        <div class="value" style="color:var(--rose);">₹${Number(f.predicted_expenses).toLocaleString('en-IN')}</div>
+      </div>
+      <div class="forecast-metric" style="border-color:${out.color}25; background: ${out.bg}30;">
+        <div class="label">Outlook</div>
+        <div class="value" style="color:${out.color};font-size:18px;display:flex;align-items:center;justify-content:center;gap:6px;font-family:'Plus Jakarta Sans';font-weight:800;">
+          <i data-lucide="${out.icon}" style="width: 18px; height: 18px;"></i> ${out.label}
+        </div>
+      </div>
+    </div>
+    <div class="card" style="margin-bottom:20px;border-color:rgba(16,185,129,0.1); border-left: 4px solid var(--emerald);">
+      <div style="font-size:11px;font-weight:800;color:var(--text-muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:8px;">AI Summary</div>
+      <div style="font-size:14px;color:var(--text-secondary);line-height:1.7;">${f.summary}</div>
+    </div>
+    ${f.risk_areas && f.risk_areas.length ? `
+    <div class="card" style="border-color:rgba(244,63,94,0.1); border-left: 4px solid var(--rose);">
+      <div style="font-size:11px;font-weight:800;color:var(--text-muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:14px;">⚠️ Risk Areas (Predicted Overspend)</div>
+      <div style="display:flex;flex-wrap:wrap;gap:8px;">
+        ${f.risk_areas.map(r => `<span class="badge badge-red" style="font-weight:700;"><i data-lucide="alert-triangle" style="width:11px;height:11px;margin-right:3px;display:inline-block;"></i>${r}</span>`).join('')}
+      </div>
+    </div>` : ''}
+  `;
+  
+  // Reinitialize Lucide vector icons
+  lucide.createIcons();
+  
+  document.getElementById('forecast-results').style.display = 'block';
+}
+</script>
+<style>
+  @keyframes fadeIn { from{opacity:0;transform:translateY(8px)} to{opacity:1;transform:translateY(0)} }
+</style>
+{% endblock %}

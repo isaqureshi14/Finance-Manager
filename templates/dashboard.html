@@ -1,0 +1,442 @@
+{% extends "base.html" %}
+{% block title %}Dashboard{% endblock %}
+{% block page_title %}Dashboard{% endblock %}
+{% block page_subtitle %}{{ stats.month }}/{{ stats.year }} — financial overview{% endblock %}
+
+{% block head %}
+<style>
+  .stat-card-icon {
+    width: 42px;
+    height: 42px;
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .icon-balance { background: var(--accent-dim); color: var(--accent); border: 1px solid rgba(217,160,91,0.25); }
+  .icon-income { background: rgba(16, 185, 129, 0.1); color: var(--emerald); border: 1px solid rgba(16, 185, 129, 0.2); }
+  .icon-expense { background: rgba(244, 63, 94, 0.1); color: var(--rose); border: 1px solid rgba(244, 63, 94, 0.2); }
+  .icon-savings { background: rgba(251, 191, 36, 0.1); color: var(--amber); border: 1px solid rgba(251, 191, 36, 0.2); }
+  
+  .modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 24px;
+  }
+  .type-toggle-btn {
+    flex: 1;
+    padding: 12px;
+    font-weight: 700;
+    border-radius: 12px;
+    border: 1px solid transparent;
+    transition: all 0.2s;
+  }
+  .type-toggle-btn.active {
+    background: var(--accent-dim);
+    border-color: var(--border-active);
+    color: var(--text-primary);
+  }
+  
+  /* Credit Card Styling */
+  .credit-card-style {
+    border: 1px solid rgba(217, 160, 91, 0.15) !important;
+    background: linear-gradient(135deg, #1b1916 0%, #0c0b0a 100%) !important;
+  }
+  body.theme-light .credit-card-style {
+    background: linear-gradient(135deg, #ffffff 0%, #f5f5f4 100%) !important;
+    border-color: rgba(180, 83, 9, 0.15) !important;
+  }
+</style>
+{% endblock %}
+
+{% block topbar_actions %}
+<button class="btn btn-primary" onclick="openModal('add-tx-modal')">
+  <i data-lucide="plus" style="width: 16px; height: 16px;"></i> Add Transaction
+</button>
+{% endblock %}
+
+{% block content %}
+<!-- Stat Cards -->
+<div class="grid-4" style="margin-bottom:24px;">
+  <!-- Balance Credit Card Visual -->
+  <div class="card credit-card-style" style="padding: 24px;">
+    <div style="display:flex; justify-content:space-between; align-items:start; margin-bottom:14px;">
+      <div class="card-title" style="margin-bottom:0;">Net Balance</div>
+      <div class="stat-card-icon icon-balance">
+        <i data-lucide="scale" style="width:18px;height:18px;"></i>
+      </div>
+    </div>
+    <div style="display: flex; align-items: baseline; gap: 4px; margin-bottom: 20px;">
+      <span class="stat-value" id="stat-balance" style="color:var(--text-primary); font-size:32px;">₹0</span>
+    </div>
+    <div style="display:flex; justify-content:space-between; align-items:end;">
+      <div>
+        <div style="font-size: 8px; font-weight: 800; text-transform: uppercase; color: var(--text-muted); letter-spacing: 0.5px;">Account Holder</div>
+        <div style="font-size: 13px; font-weight: 700; color: var(--text-primary); margin-top: 2px;" id="card-holder-name">{{ user.name }}</div>
+      </div>
+      <div style="text-align: right;">
+        <div style="font-size: 12px; font-weight: 700; font-family: 'JetBrains Mono'; letter-spacing: 1px; color: var(--text-muted);">•••• 9154</div>
+      </div>
+    </div>
+  </div>
+  
+  <div class="card" style="border-color: rgba(16,185,129,0.15);">
+    <div style="display:flex; justify-content:space-between; align-items:start; margin-bottom:12px;">
+      <div class="card-title" style="margin-bottom:0;">Total Income</div>
+      <div class="stat-card-icon icon-income">
+        <i data-lucide="arrow-down-left" style="width:18px;height:18px;"></i>
+      </div>
+    </div>
+    <div class="stat-value" id="stat-income" style="color:var(--emerald);">₹0</div>
+    <div class="stat-label">This month</div>
+  </div>
+
+  <div class="card" style="border-color: rgba(244,63,94,0.15);">
+    <div style="display:flex; justify-content:space-between; align-items:start; margin-bottom:12px;">
+      <div class="card-title" style="margin-bottom:0;">Total Expenses</div>
+      <div class="stat-card-icon icon-expense">
+        <i data-lucide="arrow-up-right" style="width:18px;height:18px;"></i>
+      </div>
+    </div>
+    <div class="stat-value" id="stat-expenses" style="color:var(--rose);">₹0</div>
+    <div class="stat-label">This month</div>
+  </div>
+
+  <div class="card" style="border-color: rgba(251,191,36,0.15);">
+    <div style="display:flex; justify-content:space-between; align-items:start; margin-bottom:12px;">
+      <div class="card-title" style="margin-bottom:0;">Savings Rate</div>
+      <div class="stat-card-icon icon-savings">
+        <i data-lucide="percent" style="width:18px;height:18px;"></i>
+      </div>
+    </div>
+    <div class="stat-value" id="stat-savings" style="color:var(--amber);">0%</div>
+    <div class="stat-label">of income saved</div>
+  </div>
+</div>
+
+<!-- Quick CTAs -->
+<div style="display: flex; gap: 12px; margin-bottom: 24px;">
+  <button class="btn" style="flex: 1; background: var(--accent); color: #000; font-weight: 700; border-radius: 14px; padding: 12px; gap: 6px;" onclick="setType('expense'); openModal('add-tx-modal')">
+    <i data-lucide="arrow-up-right" style="width: 16px; height: 16px;"></i> Transfer (Add Expense)
+  </button>
+  <button class="btn btn-ghost" style="flex: 1; font-weight: 700; border-radius: 14px; padding: 12px; gap: 6px;" onclick="setType('income'); openModal('add-tx-modal')">
+    <i data-lucide="arrow-down-left" style="width: 16px; height: 16px;"></i> Request (Add Income)
+  </button>
+</div>
+
+<!-- Charts Row -->
+<div class="grid-2" style="margin-bottom:24px;">
+  <div class="card">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;">
+      <div style="font-size:14px;font-weight:700;">Income vs Expenses Trend</div>
+      <span class="badge badge-green">6 Months</span>
+    </div>
+    <div style="position:relative; height:200px;">
+      <canvas id="trend-chart" height="200"></canvas>
+    </div>
+  </div>
+  <div class="card">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;">
+      <div style="font-size:14px;font-weight:700;">Spending by Category</div>
+      <span class="badge badge-amber">This Month</span>
+    </div>
+    <div style="position:relative; height:200px;">
+      <canvas id="category-chart" height="200"></canvas>
+      <div style="position:absolute; top:52%; left:50%; transform:translate(-50%, -50%); text-align:center; pointer-events:none;">
+        <div style="font-size:9px; font-weight:800; text-transform:uppercase; color:var(--text-muted); letter-spacing:1px;">Spent</div>
+        <div style="font-size:15px; font-weight:800; font-family:'JetBrains Mono',monospace; color:var(--text-primary); margin-top:2px;" id="doughnut-center-val">₹0</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Recent Transactions -->
+<div class="card">
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;">
+    <div style="font-size:14px;font-weight:700;">Recent Transactions</div>
+    <a href="/transactions" style="font-size:13px;color:var(--accent);text-decoration:none;font-weight:700;display:flex;align-items:center;gap:4px;">View all <i data-lucide="arrow-right" style="width: 12px; height: 12px;"></i></a>
+  </div>
+  <div style="overflow-x:auto;">
+    <table class="data-table">
+      <thead>
+        <tr>
+          <th>Transaction</th>
+          <th>Category</th>
+          <th>Date</th>
+          <th style="text-align:right;">Amount</th>
+        </tr>
+      </thead>
+      <tbody id="recent-tx-body">
+        <tr><td colspan="4" style="text-align:center;color:#6b7280;padding:24px;">Loading...</td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- Add Transaction Modal -->
+<div class="modal-overlay" id="add-tx-modal">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-title">Add Transaction</div>
+      <button onclick="closeModal('add-tx-modal')" style="background:none;border:none;color:#8899b4;font-size:20px;cursor:pointer;">✕</button>
+    </div>
+    <div style="display:flex;gap:8px;margin-bottom:20px;">
+      <button class="btn btn-ghost type-toggle-btn active" id="type-expense" onclick="setType('expense')">📤 Expense</button>
+      <button class="btn btn-ghost type-toggle-btn" id="type-income" onclick="setType('income')">📥 Income</button>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Title</label>
+      <input type="text" id="tx-title" class="form-input" placeholder="e.g. Rent payment" />
+    </div>
+    <div class="grid-2">
+      <div class="form-group">
+        <label class="form-label">Amount (₹)</label>
+        <input type="number" id="tx-amount" class="form-input" placeholder="0" />
+      </div>
+      <div class="form-group">
+        <label class="form-label">Date</label>
+        <input type="date" id="tx-date" class="form-input" />
+      </div>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Category</label>
+      <select id="tx-category" class="form-input">
+        <option value="">Select category</option>
+      </select>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Note (optional)</label>
+      <input type="text" id="tx-note" class="form-input" placeholder="Any notes..." />
+    </div>
+    <div style="display:flex;gap:12px;margin-top:8px;">
+      <button class="btn btn-ghost" onclick="closeModal('add-tx-modal')" style="flex:1;">Cancel</button>
+      <button class="btn btn-primary" onclick="addTransaction()" style="flex:2;">Add Transaction</button>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+let currentType = 'expense';
+let dashData = null;
+
+document.getElementById('tx-date').value = new Date().toISOString().split('T')[0];
+
+function setType(t) {
+  currentType = t;
+  document.getElementById('type-expense').classList.toggle('active', t === 'expense');
+  document.getElementById('type-income').classList.toggle('active', t === 'income');
+  loadCategoriesForType(t);
+}
+
+function openModal(id) { 
+  document.getElementById(id).classList.add('open'); 
+  loadCategoriesForType(currentType); 
+}
+function closeModal(id) { 
+  document.getElementById(id).classList.remove('open'); 
+}
+
+async function loadCategoriesForType(type) {
+  const cats = await api('/api/categories');
+  const sel = document.getElementById('tx-category');
+  sel.innerHTML = '<option value="">Select category</option>';
+  cats.filter(c => c.type === type).forEach(c => {
+    sel.innerHTML += `<option value="${c.id}">${c.icon} ${c.name}</option>`;
+  });
+}
+
+async function addTransaction() {
+  const title = document.getElementById('tx-title').value.trim();
+  const amount = document.getElementById('tx-amount').value;
+  const date = document.getElementById('tx-date').value;
+  const category_id = document.getElementById('tx-category').value;
+  const note = document.getElementById('tx-note').value;
+  if (!title || !amount || !date) { showToast('Please fill required fields', 'error'); return; }
+  const res = await api('/api/transactions', 'POST', { title, amount, type: currentType, category_id, date, note });
+  if (res.success) {
+    closeModal('add-tx-modal');
+    showToast('Transaction added!');
+    loadDashboard();
+    document.getElementById('tx-title').value = '';
+    document.getElementById('tx-amount').value = '';
+    document.getElementById('tx-note').value = '';
+  }
+}
+
+let trendChart, catChart;
+
+async function loadDashboard() {
+  const data = await api('/api/dashboard-data');
+  dashData = data;
+
+  document.getElementById('stat-balance').textContent = formatINR(data.balance);
+  document.getElementById('stat-income').textContent = formatINR(data.income);
+  document.getElementById('stat-expenses').textContent = formatINR(data.expenses);
+  document.getElementById('doughnut-center-val').textContent = formatINR(data.expenses);
+  
+  const savings = data.income > 0 ? Math.round((data.balance / data.income) * 100) : 0;
+  document.getElementById('stat-savings').textContent = savings + '%';
+
+  // Recent transactions
+  const tbody = document.getElementById('recent-tx-body');
+  if (data.recent_transactions.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="4" style="text-align:center;color:#6b7280;padding:24px;">No transactions yet. Add your first one!</td></tr>';
+  } else {
+    tbody.innerHTML = data.recent_transactions.map(t => `
+      <tr>
+        <td>
+          <div style="font-weight:700;font-size:14px;color:var(--text-primary);">${t.title}</div>
+          ${t.note ? `<div style="font-size:11px;color:var(--text-muted);margin-top:2px;">${t.note}</div>` : ''}
+        </td>
+        <td>
+          <span class="chip">
+            <span style="display:flex;align-items:center;justify-content:center;color:${t.category_color}">
+              <i data-lucide="${t.category_icon || 'package'}" style="width:14px;height:14px;"></i>
+            </span> 
+            <span style="margin-left:4px;">${t.category}</span>
+          </span>
+        </td>
+        <td style="color:var(--text-secondary);font-size:13px;">${t.date}</td>
+        <td style="text-align:right;" class="${t.type === 'income' ? 'amount-income' : 'amount-expense'}">
+          ${t.type === 'income' ? '+' : '-'}${formatINR(t.amount)}
+        </td>
+      </tr>
+    `).join('');
+    
+    // Parse Lucide SVG icons in the transactions rows
+    lucide.createIcons();
+  }
+
+  // Get current styles for Chart.js
+  const styles = getComputedStyle(document.body);
+  const textPrimary = styles.getPropertyValue('--text-primary').trim();
+  const textSecondary = styles.getPropertyValue('--text-secondary').trim();
+  const borderGrid = 'rgba(255,255,255,0.03)';
+  const goldColor = styles.getPropertyValue('--accent').trim() || '#d9a05b';
+
+  // Trend chart (Line chart with gradient fills)
+  if (trendChart) trendChart.destroy();
+  const tCtx = document.getElementById('trend-chart').getContext('2d');
+  
+  const incGradient = tCtx.createLinearGradient(0, 0, 0, 200);
+  incGradient.addColorStop(0, 'rgba(217, 160, 91, 0.25)');
+  incGradient.addColorStop(1, 'rgba(217, 160, 91, 0.0)');
+  
+  const expGradient = tCtx.createLinearGradient(0, 0, 0, 200);
+  expGradient.addColorStop(0, 'rgba(244, 63, 94, 0.25)');
+  expGradient.addColorStop(1, 'rgba(244, 63, 94, 0.0)');
+
+  trendChart = new Chart(tCtx, {
+    type: 'line',
+    data: {
+      labels: data.trends.map(t => t.month),
+      datasets: [
+        { 
+          label: 'Income', 
+          data: data.trends.map(t => t.income), 
+          borderColor: goldColor, 
+          backgroundColor: incGradient,
+          fill: true,
+          tension: 0.4,
+          borderWidth: 3,
+          pointBackgroundColor: goldColor,
+          pointHoverRadius: 6,
+          pointRadius: 3
+        },
+        { 
+          label: 'Expenses', 
+          data: data.trends.map(t => t.expenses), 
+          borderColor: '#f43f5e', 
+          backgroundColor: expGradient,
+          fill: true,
+          tension: 0.4,
+          borderWidth: 3,
+          pointBackgroundColor: '#f43f5e',
+          pointHoverRadius: 6,
+          pointRadius: 3
+        }
+      ]
+    },
+    options: {
+      responsive: true, 
+      maintainAspectRatio: false,
+      plugins: { 
+        legend: { labels: { color: textSecondary, font: { family: 'Plus Jakarta Sans', size: 11, weight: 600 } } },
+        tooltip: {
+          padding: 10,
+          backgroundColor: 'rgba(27, 25, 22, 0.95)',
+          titleColor: '#fff',
+          titleFont: { family: 'Plus Jakarta Sans', size: 12, weight: 700 },
+          bodyFont: { family: 'JetBrains Mono', size: 11 },
+          borderColor: 'rgba(255, 255, 255, 0.08)',
+          borderWidth: 1
+        }
+      },
+      scales: {
+        x: { grid: { color: borderGrid }, ticks: { color: textSecondary, font: { family: 'Plus Jakarta Sans', size: 10 } } },
+        y: { grid: { color: borderGrid }, ticks: { color: textSecondary, font: { family: 'Plus Jakarta Sans', size: 10 }, callback: v => '₹' + (v/1000)+'k' } }
+      }
+    }
+  });
+
+  // Category chart (refined doughnut in gold-brown palette)
+  if (catChart) catChart.destroy();
+  const cats = Object.keys(data.category_spending);
+  const vals = Object.values(data.category_spending);
+  
+  // Theme-aware gold/brown color scheme
+  const themeColors = ['#d9a05b', '#cca470', '#b45309', '#f59e0b', '#78716c', '#a8a29e', '#57534e', '#d6d3d1'];
+  
+  const cCtx = document.getElementById('category-chart').getContext('2d');
+  catChart = new Chart(cCtx, {
+    type: 'doughnut',
+    data: {
+      labels: cats.length ? cats : ['No Expenses'],
+      datasets: [{ 
+        data: vals.length ? vals : [1], 
+        backgroundColor: cats.length ? themeColors.slice(0, cats.length) : ['rgba(120,113,108,0.15)'], 
+        borderWidth: 2, 
+        borderColor: styles.getPropertyValue('--bg-card').trim() || '#1b1916',
+        hoverBorderWidth: 0
+      }]
+    },
+    options: {
+      responsive: true, 
+      maintainAspectRatio: false, 
+      cutout: '75%',
+      plugins: { 
+        legend: { 
+          position: 'right', 
+          labels: { 
+            color: textSecondary, 
+            font: { family: 'Plus Jakarta Sans', size: 11, weight: 500 }, 
+            padding: 10, 
+            boxWidth: 10 
+          } 
+        },
+        tooltip: {
+          enabled: vals.length > 0,
+          padding: 10,
+          backgroundColor: 'rgba(27, 25, 22, 0.95)',
+          titleColor: '#fff',
+          titleFont: { family: 'Plus Jakarta Sans', size: 12, weight: 700 },
+          bodyFont: { family: 'JetBrains Mono', size: 11 },
+          borderColor: 'rgba(255, 255, 255, 0.08)',
+          borderWidth: 1
+        }
+      }
+    }
+  });
+}
+
+// Re-render and load data when theme changes
+window.addEventListener('theme-changed', () => {
+  loadDashboard();
+});
+
+loadDashboard();
+</script>
+{% endblock %}

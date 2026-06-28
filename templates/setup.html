@@ -1,0 +1,244 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>FinWise — Setup</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet"/>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'Plus Jakarta Sans', sans-serif;
+      background: #0c0b0a; color: #f5f5f4;
+      min-height: 100vh; display: flex;
+      align-items: center; justify-content: center;
+      position: relative; overflow: hidden;
+      background-image: radial-gradient(circle at 50% 50%, #171513 0%, #0c0b0a 100%);
+    }
+    .bg-glow {
+      position: absolute; border-radius: 50%;
+      filter: blur(120px); pointer-events: none; opacity: 0.12;
+    }
+    .glow-1 { width: 500px; height: 500px; background: #d9a05b; top: -150px; left: -150px; }
+    .glow-2 { width: 450px; height: 450px; background: #854d0e; bottom: -100px; right: -100px; }
+    .setup-card {
+      position: relative; z-index: 10;
+      background: rgba(27, 25, 22, 0.75);
+      backdrop-filter: blur(20px);
+      border: 1px solid rgba(255,255,255,0.05);
+      border-radius: 28px; padding: 40px;
+      width: 480px; max-width: 95vw;
+      box-shadow: 0 24px 64px rgba(0,0,0,0.6);
+    }
+    .setup-card::before {
+      content: '';
+      position: absolute;
+      top: 0; left: 0; right: 0; height: 1px;
+      background: linear-gradient(90deg, rgba(255,255,255,0.06) 0%, rgba(255,255,255,0.01) 100%);
+      pointer-events: none;
+    }
+    .logo { display: flex; align-items: center; gap: 12px; margin-bottom: 24px; }
+    .logo-icon {
+      width: 42px; height: 42px;
+      background: linear-gradient(135deg, #d9a05b, #a16207);
+      border-radius: 12px; display: flex; align-items: center; justify-content: center;
+      color: #000; box-shadow: 0 0 20px rgba(217,160,91,0.3);
+    }
+    .logo-text { font-size: 24px; font-weight: 800; letter-spacing: -0.5px; }
+    .logo-text span { color: #d9a05b; }
+    h2 { font-size: 22px; font-weight: 800; margin-bottom: 6px; letter-spacing: -0.5px; }
+    .sub { font-size: 14px; color: #a8a29e; margin-bottom: 28px; line-height: 1.5; }
+    .form-group { margin-bottom: 20px; }
+    .form-label { display: block; font-size: 11px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase; color: #a8a29e; margin-bottom: 8px; }
+    .form-input {
+      width: 100%; padding: 12px 16px;
+      background: rgba(0,0,0,0.25);
+      border: 1px solid rgba(255,255,255,0.05);
+      border-radius: 12px; color: #f5f5f4;
+      font-size: 14px; font-family: 'Plus Jakarta Sans', sans-serif;
+      outline: none; transition: all 0.2s;
+      box-shadow: inset 0 2px 4px rgba(0,0,0,0.2);
+    }
+    .form-input:focus {
+      border-color: rgba(217,160,91,0.5);
+      background: rgba(217,160,91,0.04);
+      box-shadow: 0 0 0 3px rgba(217,160,91,0.15);
+    }
+    .age-hint { font-size: 12px; color: #78716c; margin-top: 6px; font-weight: 500; transition: color 0.2s; }
+    .btn-setup {
+      width: 100%; padding: 14px;
+      background: linear-gradient(135deg, #d9a05b, #a16207);
+      color: #000000;
+      border: none; border-radius: 12px;
+      font-size: 15px; font-weight: 700;
+      cursor: pointer; margin-top: 12px;
+      transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1); font-family: 'Plus Jakarta Sans', sans-serif;
+      box-shadow: 0 4px 14px 0 rgba(217, 160, 91, 0.3);
+    }
+    .btn-setup:hover {
+      box-shadow: 0 6px 20px 0 rgba(217, 160, 91, 0.45);
+      background: linear-gradient(135deg, #eab308, #ca8a04);
+      transform: translateY(-1px);
+    }
+    .btn-setup:active {
+      transform: scale(0.98);
+    }
+    .age-groups {
+      display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px;
+      margin-top: 10px;
+    }
+    .age-chip {
+      padding: 10px 6px 8px; border-radius: 12px;
+      background: rgba(255,255,255,0.02);
+      border: 1px solid rgba(255,255,255,0.05);
+      font-size: 10px; text-align: center; color: #a8a29e;
+      font-weight: 600;
+      transition: all 0.2s ease;
+      cursor: default;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 4px;
+    }
+    .age-chip i {
+      width: 14px;
+      height: 14px;
+      color: var(--text-muted);
+    }
+    .age-chip.active {
+      background: rgba(217, 160, 91, 0.12);
+      border-color: rgba(217, 160, 91, 0.45);
+      color: #fff;
+      box-shadow: 0 0 12px rgba(217, 160, 91, 0.15);
+    }
+    .age-chip.active i {
+      color: #d9a05b;
+    }
+    .currency-note { font-size: 12px; color: #78716c; margin-top: 6px; }
+  </style>
+</head>
+<body>
+  <div class="bg-glow glow-1"></div>
+  <div class="bg-glow glow-2"></div>
+
+  <div class="setup-card">
+    <div class="logo">
+      <div class="logo-icon"><i data-lucide="wallet" style="width: 22px; height: 22px;"></i></div>
+      <div class="logo-text">Fin<span>Wise</span></div>
+    </div>
+    <h2>Let's set up your profile</h2>
+    <p class="sub">FinWise personalizes AI insights based on your age group and financial situation.</p>
+
+    <div class="form-group">
+      <label class="form-label">Your Name</label>
+      <input type="text" id="name" class="form-input" placeholder="e.g. Isa Khan" />
+    </div>
+
+    <div class="form-group">
+      <label class="form-label">Your Age</label>
+      <input type="number" id="age" class="form-input" placeholder="e.g. 20" min="10" max="100" oninput="updateAgeGroup(this.value)" />
+      <div class="age-hint" id="age-hint">Enter your age to see your financial group</div>
+      <div class="age-groups" style="margin-top:10px;">
+        <div class="age-chip" id="age-chip-0">
+          <i data-lucide="baby"></i>
+          <span>Under 18<br/>Teen</span>
+        </div>
+        <div class="age-chip" id="age-chip-1">
+          <i data-lucide="graduation-cap"></i>
+          <span>18–25<br/>Young Adult</span>
+        </div>
+        <div class="age-chip" id="age-chip-2">
+          <i data-lucide="briefcase"></i>
+          <span>26–35<br/>Adult</span>
+        </div>
+        <div class="age-chip" id="age-chip-3">
+          <i data-lucide="trending-up"></i>
+          <span>36–50<br/>Mid-Career</span>
+        </div>
+        <div class="age-chip" id="age-chip-4">
+          <i data-lucide="palmtree"></i>
+          <span>51–65<br/>Pre-Retire</span>
+        </div>
+        <div class="age-chip" id="age-chip-5">
+          <i data-lucide="smile"></i>
+          <span>65+<br/>Senior</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="form-group">
+      <label class="form-label">Monthly Income (₹)</label>
+      <input type="number" id="monthly_income" class="form-input" placeholder="e.g. 50000" />
+      <div class="currency-note">This helps AI calculate your saving potential accurately.</div>
+    </div>
+
+    <button class="btn-setup" onclick="doSetup()">Get Started →</button>
+  </div>
+
+  <script>
+    function updateAgeGroup(age) {
+      const hint = document.getElementById('age-hint');
+      
+      // Clear active class from all chips
+      document.querySelectorAll('.age-chip').forEach(c => c.classList.remove('active'));
+      
+      age = parseInt(age);
+      if (!age) { 
+        hint.textContent = 'Enter your age to see your financial group'; 
+        hint.style.color = '#78716c';
+        return; 
+      }
+      
+      let g = '';
+      let chipId = '';
+      
+      if (age < 18) {
+        g = '👦 Teen — Focus: saving habits & pocket money';
+        chipId = 'age-chip-0';
+      } else if (age <= 25) {
+        g = '🎓 Young Adult — Focus: emergency fund, career investment';
+        chipId = 'age-chip-1';
+      } else if (age <= 35) {
+        g = '💼 Adult — Focus: wealth building, loans, family planning';
+        chipId = 'age-chip-2';
+      } else if (age <= 50) {
+        g = '📈 Mid-Career — Focus: investments, retirement corpus';
+        chipId = 'age-chip-3';
+      } else if (age <= 65) {
+        g = '🏖️ Pre-Retirement — Focus: low-risk, pension planning';
+        chipId = 'age-chip-4';
+      } else {
+        g = '🧓 Senior — Focus: fixed income, healthcare budget';
+        chipId = 'age-chip-5';
+      }
+      
+      hint.textContent = g;
+      hint.style.color = '#d9a05b';
+      
+      const activeChip = document.getElementById(chipId);
+      if (activeChip) {
+        activeChip.classList.add('active');
+      }
+    }
+
+    async function doSetup() {
+      const name = document.getElementById('name').value.trim();
+      const age = document.getElementById('age').value;
+      const income = document.getElementById('monthly_income').value || 0;
+      if (!name || !age) { alert('Please fill in your name and age.'); return; }
+      const res = await fetch('/setup', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({name, age, monthly_income: income})
+      });
+      const data = await res.json();
+      if (data.success) window.location.href = '/dashboard';
+    }
+
+    // Initialize Lucide Icons
+    lucide.createIcons();
+  </script>
+</body>
+</html>

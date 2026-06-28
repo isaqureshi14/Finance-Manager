@@ -1,0 +1,167 @@
+{% extends "base.html" %}
+{% block title %}Categories{% endblock %}
+{% block page_title %}Categories{% endblock %}
+{% block page_subtitle %}Manage your income & expense categories{% endblock %}
+
+{% block head %}
+<style>
+  .column-title {
+    font-size: 11px;
+    font-weight: 800;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    margin-bottom: 16px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  
+  .category-icon-box {
+    width: 38px;
+    height: 38px;
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid transparent;
+  }
+  
+  .btn-cat-delete {
+    padding: 6px 10px;
+    font-size: 11px;
+    border-radius: 8px;
+    font-weight: 700;
+  }
+</style>
+{% endblock %}
+
+{% block topbar_actions %}
+<button class="btn btn-primary" onclick="openModal('cat-modal')">
+  <i data-lucide="plus" style="width: 16px; height: 16px; color: #000;"></i> Add Category
+</button>
+{% endblock %}
+
+{% block content %}
+<div class="grid-2" style="gap: 24px;">
+  <!-- Income Categories -->
+  <div>
+    <div class="column-title" style="color: var(--emerald);">
+      <span style="display:inline-block; width:8px; height:8px; border-radius:50%; background:var(--emerald); box-shadow: 0 0 8px var(--emerald-glow);"></span>
+      Income Categories
+    </div>
+    <div style="display: flex; flex-direction: column; gap: 10px;" id="income-cats"></div>
+  </div>
+  
+  <!-- Expense Categories -->
+  <div>
+    <div class="column-title" style="color: var(--rose);">
+      <span style="display:inline-block; width:8px; height:8px; border-radius:50%; background:var(--rose); box-shadow: 0 0 8px var(--rose-glow);"></span>
+      Expense Categories
+    </div>
+    <div style="display: flex; flex-direction: column; gap: 10px;" id="expense-cats"></div>
+  </div>
+</div>
+
+<!-- Add Modal -->
+<div class="modal-overlay" id="cat-modal">
+  <div class="modal">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px;">
+      <div class="modal-title">Add Category</div>
+      <button onclick="closeModal('cat-modal')" style="background: none; border: none; color: #8899b4; font-size: 20px; cursor: pointer;">✕</button>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Category Name</label>
+      <input type="text" id="cat-name" class="form-input" placeholder="e.g. Gym" />
+    </div>
+    <div class="grid-2">
+      <div class="form-group">
+        <label class="form-label">Icon (Lucide name)</label>
+        <input type="text" id="cat-icon" class="form-input" placeholder="e.g. briefcase, zap" />
+      </div>
+      <div class="form-group">
+        <label class="form-label">Color</label>
+        <input type="color" id="cat-color" class="form-input" value="#d9a05b" style="height: 46px; padding: 4px 8px; cursor: pointer;" />
+      </div>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Type</label>
+      <select id="cat-type" class="form-input">
+        <option value="expense">Expense</option>
+        <option value="income">Income</option>
+      </select>
+    </div>
+    <div style="display: flex; gap: 12px; margin-top: 8px;">
+      <button class="btn btn-ghost" onclick="closeModal('cat-modal')" style="flex: 1;">Cancel</button>
+      <button class="btn btn-primary" onclick="addCategory()" style="flex: 2;">Add Category</button>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function openModal(id) { document.getElementById(id).classList.add('open'); }
+function closeModal(id) { document.getElementById(id).classList.remove('open'); }
+
+async function loadCategories() {
+  const cats = await api('/api/categories');
+  const income = cats.filter(c => c.type === 'income');
+  const expense = cats.filter(c => c.type === 'expense');
+
+  function renderCats(arr, containerId) {
+    const el = document.getElementById(containerId);
+    el.innerHTML = arr.map(c => {
+      const displayColor = c.color || '#d9a05b';
+      return `
+        <div class="card" style="padding: 12px 16px; display: flex; align-items: center; justify-content: space-between; border-color: rgba(255,255,255,0.04);">
+          <div style="display: flex; align-items: center; gap: 12px;">
+            <div class="category-icon-box" style="background: ${displayColor}15; border-color: ${displayColor}25;">
+              <i data-lucide="${c.icon || 'package'}" style="width: 18px; height: 18px; color: ${displayColor};"></i>
+            </div>
+            <div>
+              <div style="font-size: 14px; font-weight: 700; color: var(--text-primary);">${c.name}</div>
+              <div style="font-size: 11px; color: var(--text-muted); margin-top: 1px; text-transform: capitalize;">${c.type}</div>
+            </div>
+          </div>
+          <div style="display: flex; align-items: center; gap: 12px;">
+            <div style="width: 8px; height: 8px; border-radius: 50%; background: ${displayColor}; box-shadow: 0 0 8px ${displayColor}80;"></div>
+            <button onclick="deleteCategory(${c.id})" class="btn btn-danger btn-cat-delete">Delete</button>
+          </div>
+        </div>
+      `;
+    }).join('') || `<div style="color: var(--text-muted); font-size: 13px; text-align: center; padding: 32px 0;">No categories yet.</div>`;
+    
+    // Reinitialize Lucide vector icons
+    lucide.createIcons();
+  }
+
+  renderCats(income, 'income-cats');
+  renderCats(expense, 'expense-cats');
+}
+
+async function addCategory() {
+  const name = document.getElementById('cat-name').value.trim();
+  const icon = document.getElementById('cat-icon').value.trim() || 'package';
+  const color = document.getElementById('cat-color').value;
+  const type = document.getElementById('cat-type').value;
+  if (!name) { showToast('Enter a category name', 'error'); return; }
+  const res = await api('/api/categories', 'POST', { name, icon, color, type });
+  if (res.success) {
+    closeModal('cat-modal');
+    showToast('Category added!');
+    document.getElementById('cat-name').value = '';
+    document.getElementById('cat-icon').value = '';
+    loadCategories();
+  }
+}
+
+async function deleteCategory(id) {
+  if (!confirm('Delete this category? Transactions linked to it won\'t be deleted.')) return;
+  await api(`/api/categories/${id}`, 'DELETE');
+  showToast('Category deleted', 'warning');
+  loadCategories();
+}
+
+loadCategories();
+</script>
+{% endblock %}

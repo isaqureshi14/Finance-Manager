@@ -1,0 +1,216 @@
+{% extends "base.html" %}
+{% block title %}Reports{% endblock %}
+{% block page_title %}Reports{% endblock %}
+{% block page_subtitle %}12-month financial history & analysis{% endblock %}
+
+{% block head %}
+<style>
+  .report-icon {
+    width: 42px;
+    height: 42px;
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .icon-income-12 { background: rgba(6, 182, 212, 0.1); color: var(--cyan); border: 1px solid rgba(6, 182, 212, 0.2); }
+  .icon-expense-12 { background: rgba(244, 63, 94, 0.1); color: var(--rose); border: 1px solid rgba(244, 63, 94, 0.2); }
+  .icon-savings-12 { background: var(--accent-dim); color: var(--accent); border: 1px solid rgba(217,160,91,0.25); }
+  .icon-avg-12 { background: rgba(251, 191, 36, 0.1); color: var(--amber); border: 1px solid rgba(251, 191, 36, 0.2); }
+</style>
+{% endblock %}
+
+{% block content %}
+<!-- Summary cards updated after load -->
+<div class="grid-4" style="margin-bottom: 24px;">
+  <div class="card" style="border-color: rgba(6,182,212,0.15);">
+    <div style="display:flex; justify-content:space-between; align-items:start; margin-bottom:12px;">
+      <div class="card-title" style="margin-bottom:0;">Total Income (12m)</div>
+      <div class="report-icon icon-income-12">
+        <i data-lucide="arrow-down-left" style="width: 18px; height: 18px;"></i>
+      </div>
+    </div>
+    <div class="stat-value" id="r-income" style="color:var(--cyan);">₹0</div>
+  </div>
+  
+  <div class="card" style="border-color: rgba(244,63,94,0.15);">
+    <div style="display:flex; justify-content:space-between; align-items:start; margin-bottom:12px;">
+      <div class="card-title" style="margin-bottom:0;">Total Expenses (12m)</div>
+      <div class="report-icon icon-expense-12">
+        <i data-lucide="arrow-up-right" style="width: 18px; height: 18px;"></i>
+      </div>
+    </div>
+    <div class="stat-value" id="r-expense" style="color:var(--rose);">₹0</div>
+  </div>
+  
+  <div class="card" style="border-color: rgba(217,160,91,0.25);">
+    <div style="display:flex; justify-content:space-between; align-items:start; margin-bottom:12px;">
+      <div class="card-title" style="margin-bottom:0;">Net Savings (12m)</div>
+      <div class="report-icon icon-savings-12">
+        <i data-lucide="scale" style="width: 18px; height: 18px;"></i>
+      </div>
+    </div>
+    <div class="stat-value" id="r-savings" style="color:var(--accent);">₹0</div>
+  </div>
+  
+  <div class="card" style="border-color: rgba(251,191,36,0.15);">
+    <div style="display:flex; justify-content:space-between; align-items:start; margin-bottom:12px;">
+      <div class="card-title" style="margin-bottom:0;">Avg Monthly Spend</div>
+      <div class="report-icon icon-avg-12">
+        <i data-lucide="bar-chart-2" style="width: 18px; height: 18px;"></i>
+      </div>
+    </div>
+    <div class="stat-value" id="r-avg" style="color:var(--amber);">₹0</div>
+  </div>
+</div>
+
+<!-- Line Chart -->
+<div class="card" style="margin-bottom: 24px;">
+  <div style="font-size: 14px; font-weight: 700; margin-bottom: 20px; color: var(--text-primary);">12-Month Income vs Expenses Trend</div>
+  <div style="position:relative; height:240px;">
+    <canvas id="line-chart" height="240"></canvas>
+  </div>
+</div>
+
+<!-- Monthly Breakdown Table -->
+<div class="card" style="padding: 0; overflow: hidden;">
+  <div style="padding: 20px 24px; border-bottom: 1px solid rgba(255,255,255,0.05); display: flex; align-items: center; gap: 8px;">
+    <i data-lucide="list" style="width: 18px; height: 18px; color: var(--accent);"></i>
+    <div style="font-size: 14px; font-weight: 700; color: var(--text-primary);">Monthly Breakdown</div>
+  </div>
+  <div style="overflow-x: auto;">
+    <table class="data-table">
+      <thead>
+        <tr>
+          <th>Month</th>
+          <th style="text-align: right;">Income</th>
+          <th style="text-align: right;">Expenses</th>
+          <th style="text-align: right;">Net Cash Flow</th>
+          <th style="text-align: right;">Savings %</th>
+        </tr>
+      </thead>
+      <tbody id="report-tbody"></tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+let reportChart;
+
+async function loadReports() {
+  const data = await api('/api/reports-data');
+  let totalIncome = 0, totalExpense = 0;
+  data.forEach(m => { totalIncome += m.income; totalExpense += m.expenses; });
+  const active = data.filter(m => m.income > 0 || m.expenses > 0);
+
+  document.getElementById('r-income').textContent = formatINR(totalIncome);
+  document.getElementById('r-expense').textContent = formatINR(totalExpense);
+  document.getElementById('r-savings').textContent = formatINR(totalIncome - totalExpense);
+  document.getElementById('r-avg').textContent = active.length ? formatINR(totalExpense / active.length) : '₹0';
+
+  // Customize Net Savings text color based on positive/negative
+  const savingsValue = document.getElementById('r-savings');
+  if (totalIncome - totalExpense < 0) {
+    savingsValue.style.color = 'var(--rose)';
+  } else {
+    savingsValue.style.color = 'var(--emerald)';
+  }
+
+  // Get current styles for Chart.js
+  const styles = getComputedStyle(document.body);
+  const textSecondary = styles.getPropertyValue('--text-secondary').trim();
+  const borderGrid = 'rgba(255,255,255,0.03)';
+  const goldColor = styles.getPropertyValue('--accent').trim() || '#d9a05b';
+
+  // Line chart with canvas gradients
+  if (reportChart) reportChart.destroy();
+  const ctx = document.getElementById('line-chart').getContext('2d');
+  
+  const incGradient = ctx.createLinearGradient(0, 0, 0, 240);
+  incGradient.addColorStop(0, 'rgba(217, 160, 91, 0.2)');
+  incGradient.addColorStop(1, 'rgba(217, 160, 91, 0.0)');
+  
+  const expGradient = ctx.createLinearGradient(0, 0, 0, 240);
+  expGradient.addColorStop(0, 'rgba(244, 63, 94, 0.2)');
+  expGradient.addColorStop(1, 'rgba(244, 63, 94, 0.0)');
+
+  reportChart = new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels: data.map(m => m.month),
+      datasets: [
+        {
+          label: 'Income', data: data.map(m => m.income),
+          borderColor: goldColor, backgroundColor: incGradient,
+          borderWidth: 3, pointRadius: 4, pointBackgroundColor: goldColor, tension: 0.4, fill: true,
+          pointHoverRadius: 6
+        },
+        {
+          label: 'Expenses', data: data.map(m => m.expenses),
+          borderColor: '#f43f5e', backgroundColor: expGradient,
+          borderWidth: 3, pointRadius: 4, pointBackgroundColor: '#f43f5e', tension: 0.4, fill: true,
+          pointHoverRadius: 6
+        }
+      ]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { 
+        legend: { labels: { color: textSecondary, font: { family: 'Plus Jakarta Sans', size: 11, weight: 600 } } },
+        tooltip: {
+          padding: 10,
+          backgroundColor: 'rgba(27, 25, 22, 0.95)',
+          titleColor: '#fff',
+          titleFont: { family: 'Plus Jakarta Sans', size: 12, weight: 700 },
+          bodyFont: { family: 'JetBrains Mono', size: 11 },
+          borderColor: 'rgba(255, 255, 255, 0.08)',
+          borderWidth: 1
+        }
+      },
+      scales: {
+        x: { grid: { color: borderGrid }, ticks: { color: textSecondary, font: { family: 'Plus Jakarta Sans', size: 10 } } },
+        y: { grid: { color: borderGrid }, ticks: { color: textSecondary, font: { family: 'Plus Jakarta Sans', size: 10 }, callback: v => '₹'+(v/1000)+'k' } }
+      }
+    }
+  });
+
+  // Table
+  const tbody = document.getElementById('report-tbody');
+  const reversed = [...data].reverse();
+  tbody.innerHTML = reversed.map(m => {
+    const net = m.income - m.expenses;
+    const savPct = m.income > 0 ? Math.round((net / m.income) * 100) : 0;
+    
+    let pctBadge = 'badge-red';
+    if (savPct >= 20) {
+      pctBadge = 'badge-green';
+    } else if (savPct >= 0) {
+      pctBadge = 'badge-amber';
+    }
+    
+    return `
+      <tr>
+        <td style="font-weight: 700; color: var(--text-primary);">${m.month}</td>
+        <td style="text-align: right;" class="amount-income">+${formatINR(m.income)}</td>
+        <td style="text-align: right;" class="amount-expense">-${formatINR(m.expenses)}</td>
+        <td style="text-align: right; font-family: 'JetBrains Mono', monospace; font-weight: 700; color: ${net>=0?'var(--emerald)':'var(--rose)'};">
+          ${net >= 0 ? '+' : '-'}${formatINR(Math.abs(net))}
+        </td>
+        <td style="text-align: right;">
+          <span class="badge ${pctBadge}">${savPct}%</span>
+        </td>
+      </tr>
+    `;
+  }).join('');
+}
+
+// Re-render and load data when theme changes
+window.addEventListener('theme-changed', () => {
+  loadReports();
+});
+
+loadReports();
+</script>
+{% endblock %}

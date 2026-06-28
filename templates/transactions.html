@@ -1,0 +1,369 @@
+{% extends "base.html" %}
+{% block title %}Transactions{% endblock %}
+{% block page_title %}Transactions{% endblock %}
+{% block page_subtitle %}Manage all your income and expenses{% endblock %}
+
+{% block head %}
+<style>
+  .filter-bar {
+    display: flex;
+    gap: 12px;
+    align-items: center;
+    flex-wrap: wrap;
+  }
+  
+  .summary-card {
+    flex: 1;
+    padding: 16px 20px;
+    border-radius: 16px;
+    border-color: rgba(255,255,255,0.04);
+  }
+  
+  .summary-card .value {
+    font-size: 20px;
+    font-weight: 800;
+    margin-top: 4px;
+  }
+  
+  .type-toggle-btn {
+    flex: 1;
+    padding: 12px;
+    font-weight: 700;
+    border-radius: 12px;
+    border: 1px solid transparent;
+    transition: all 0.2s;
+  }
+  .type-toggle-btn.active {
+    background: var(--accent-dim);
+    border-color: var(--border-active);
+    color: var(--text-primary);
+  }
+  
+  .btn-action {
+    padding: 6px 12px;
+    font-size: 12px;
+    font-weight: 700;
+    border-radius: 8px;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+  }
+</style>
+{% endblock %}
+
+{% block topbar_actions %}
+<button class="btn btn-primary" onclick="openAddModal()">
+  <i data-lucide="plus" style="width: 16px; height: 16px; color: #000;"></i> Add Transaction
+</button>
+{% endblock %}
+
+{% block content %}
+<!-- Filters -->
+<div class="card" style="margin-bottom: 20px;">
+  <div class="filter-bar">
+    <select id="filter-type" class="form-input" style="width: 140px;" onchange="filterTransactions()">
+      <option value="">All Types</option>
+      <option value="income">Income</option>
+      <option value="expense">Expense</option>
+    </select>
+    <select id="filter-cat" class="form-input" style="width: 180px;" onchange="filterTransactions()">
+      <option value="">All Categories</option>
+    </select>
+    <input type="month" id="filter-month" class="form-input" style="width: 170px;" onchange="filterTransactions()" />
+    <input type="text" id="filter-search" class="form-input" style="flex: 1; min-width: 180px;" placeholder="🔍 Search transactions..." oninput="filterTransactions()" />
+    <button class="btn btn-ghost" onclick="clearFilters()">Clear</button>
+  </div>
+</div>
+
+<!-- Summary Bar -->
+<div style="display: flex; gap: 16px; margin-bottom: 20px; flex-wrap: wrap;" id="summary-bar">
+  <div class="card summary-card" style="border-color: rgba(16,185,129,0.15);">
+    <div class="card-title" style="margin-bottom: 0; font-size: 10px;">Shown Income</div>
+    <div class="value amount-income" id="sum-income">₹0</div>
+  </div>
+  <div class="card summary-card" style="border-color: rgba(244,63,94,0.15);">
+    <div class="card-title" style="margin-bottom: 0; font-size: 10px;">Shown Expenses</div>
+    <div class="value amount-expense" id="sum-expense">₹0</div>
+  </div>
+  <div class="card summary-card" style="border-color: rgba(217,160,91,0.25);">
+    <div class="card-title" style="margin-bottom: 0; font-size: 10px;">Net Cash Flow</div>
+    <div class="value" id="sum-net" style="font-family:'JetBrains Mono',monospace;">₹0</div>
+  </div>
+  <div class="card summary-card">
+    <div class="card-title" style="margin-bottom: 0; font-size: 10px;">Transactions Count</div>
+    <div class="value" id="sum-count" style="color: var(--text-primary); font-family:'JetBrains Mono',monospace;">0</div>
+  </div>
+</div>
+
+<!-- Table -->
+<div class="card" style="padding: 0; overflow: hidden;">
+  <div style="overflow-x: auto;">
+    <table class="data-table">
+      <thead>
+        <tr>
+          <th>Title</th>
+          <th>Category</th>
+          <th>Date</th>
+          <th>Note</th>
+          <th style="text-align: right;">Amount</th>
+          <th style="text-align: right;">Actions</th>
+        </tr>
+      </thead>
+      <tbody id="tx-body">
+        <tr><td colspan="6" style="text-align: center; color: #6b7280; padding: 36px;">Loading...</td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- Add/Edit Modal -->
+<div class="modal-overlay" id="tx-modal">
+  <div class="modal">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px;">
+      <div class="modal-title" id="modal-title">Add Transaction</div>
+      <button onclick="closeModal('tx-modal')" style="background: none; border: none; color: #8899b4; font-size: 20px; cursor: pointer;">✕</button>
+    </div>
+    <div style="display: flex; gap: 8px; margin-bottom: 20px;">
+      <button class="btn btn-ghost type-toggle-btn active" id="type-expense" onclick="setType('expense')">📤 Expense</button>
+      <button class="btn btn-ghost type-toggle-btn" id="type-income" onclick="setType('income')">📥 Income</button>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Title</label>
+      <input type="text" id="tx-title" class="form-input" placeholder="e.g. Lunch at cafe" />
+    </div>
+    <div class="grid-2">
+      <div class="form-group">
+        <label class="form-label">Amount (₹)</label>
+        <input type="number" id="tx-amount" class="form-input" placeholder="0" />
+      </div>
+      <div class="form-group">
+        <label class="form-label">Date</label>
+        <input type="date" id="tx-date" class="form-input" />
+      </div>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Category</label>
+      <select id="tx-category" class="form-input">
+        <option value="">Select category</option>
+      </select>
+    </div>
+    <div class="form-group">
+      <label class="form-label">Note (optional)</label>
+      <input type="text" id="tx-note" class="form-input" placeholder="Any notes..." />
+    </div>
+    <input type="hidden" id="tx-id" />
+    <div style="display: flex; gap: 12px; margin-top: 8px;">
+      <button class="btn btn-ghost" onclick="closeModal('tx-modal')" style="flex: 1;">Cancel</button>
+      <button class="btn btn-primary" onclick="saveTransaction()" style="flex: 2;" id="save-btn">Add Transaction</button>
+    </div>
+  </div>
+</div>
+
+<!-- Delete Confirm Modal -->
+<div class="modal-overlay" id="delete-modal">
+  <div class="modal" style="width: 380px;">
+    <div class="modal-title" style="margin-bottom: 8px;">Delete Transaction?</div>
+    <p style="color: var(--text-secondary); font-size: 14px; margin-bottom: 24px;">This action cannot be undone.</p>
+    <input type="hidden" id="delete-id" />
+    <div style="display: flex; gap: 12px;">
+      <button class="btn btn-ghost" onclick="closeModal('delete-modal')" style="flex: 1;">Cancel</button>
+      <button class="btn btn-danger" onclick="deleteTransaction()" style="flex: 1;">Delete</button>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+let allTransactions = [];
+let currentType = 'expense';
+let editMode = false;
+
+document.getElementById('tx-date').value = new Date().toISOString().split('T')[0];
+
+// Set current month in filter
+const today = new Date();
+document.getElementById('filter-month').value = `${today.getFullYear()}-${String(today.getMonth()+1).padStart(2,'0')}`;
+
+function setType(t) {
+  currentType = t;
+  document.getElementById('type-expense').classList.toggle('active', t === 'expense');
+  document.getElementById('type-income').classList.toggle('active', t === 'income');
+  loadCatsForType(t);
+}
+
+async function loadCatsForType(type) {
+  const cats = await api('/api/categories');
+  const sel = document.getElementById('tx-category');
+  const current = sel.value;
+  sel.innerHTML = '<option value="">Select category</option>';
+  cats.filter(c => c.type === type).forEach(c => {
+    sel.innerHTML += `<option value="${c.id}" ${c.id == current ? 'selected' : ''}>${c.name}</option>`;
+  });
+  
+  // Also populate filter
+  const fsel = document.getElementById('filter-cat');
+  const fcurrent = fsel.value;
+  fsel.innerHTML = '<option value="">All Categories</option>';
+  cats.forEach(c => {
+    fsel.innerHTML += `<option value="${c.name}" ${c.name === fcurrent ? 'selected' : ''}>${c.name}</option>`;
+  });
+}
+
+function openAddModal() {
+  editMode = false;
+  document.getElementById('modal-title').textContent = 'Add Transaction';
+  document.getElementById('save-btn').textContent = 'Add Transaction';
+  document.getElementById('tx-title').value = '';
+  document.getElementById('tx-amount').value = '';
+  document.getElementById('tx-note').value = '';
+  document.getElementById('tx-date').value = new Date().toISOString().split('T')[0];
+  document.getElementById('tx-id').value = '';
+  setType('expense');
+  document.getElementById('tx-modal').classList.add('open');
+}
+
+function openEditModal(tx) {
+  editMode = true;
+  document.getElementById('modal-title').textContent = 'Edit Transaction';
+  document.getElementById('save-btn').textContent = 'Save Changes';
+  document.getElementById('tx-title').value = tx.title;
+  document.getElementById('tx-amount').value = tx.amount;
+  document.getElementById('tx-note').value = tx.note;
+  document.getElementById('tx-date').value = tx.date;
+  document.getElementById('tx-id').value = tx.id;
+  currentType = tx.type;
+  setType(tx.type);
+  setTimeout(() => {
+    document.getElementById('tx-category').value = tx.category_id || '';
+  }, 120);
+  document.getElementById('tx-modal').classList.add('open');
+}
+
+function closeModal(id) { 
+  document.getElementById(id).classList.remove('open'); 
+}
+
+async function saveTransaction() {
+  const title = document.getElementById('tx-title').value.trim();
+  const amount = document.getElementById('tx-amount').value;
+  const date = document.getElementById('tx-date').value;
+  const category_id = document.getElementById('tx-category').value;
+  const note = document.getElementById('tx-note').value;
+  const id = document.getElementById('tx-id').value;
+  if (!title || !amount || !date) { showToast('Fill required fields', 'error'); return; }
+  const body = { title, amount, type: currentType, category_id, date, note };
+  let res;
+  if (editMode && id) {
+    res = await api(`/api/transactions/${id}`, 'PUT', body);
+  } else {
+    res = await api('/api/transactions', 'POST', body);
+  }
+  if (res.success) {
+    closeModal('tx-modal');
+    showToast(editMode ? 'Transaction updated!' : 'Transaction added!');
+    loadTransactions();
+  }
+}
+
+function confirmDelete(id) {
+  document.getElementById('delete-id').value = id;
+  document.getElementById('delete-modal').classList.add('open');
+}
+
+async function deleteTransaction() {
+  const id = document.getElementById('delete-id').value;
+  const res = await api(`/api/transactions/${id}`, 'DELETE');
+  if (res.success) {
+    closeModal('delete-modal');
+    showToast('Transaction deleted!', 'warning');
+    loadTransactions();
+  }
+}
+
+function clearFilters() {
+  document.getElementById('filter-type').value = '';
+  document.getElementById('filter-cat').value = '';
+  document.getElementById('filter-month').value = '';
+  document.getElementById('filter-search').value = '';
+  filterTransactions();
+}
+
+function filterTransactions() {
+  const type = document.getElementById('filter-type').value;
+  const cat = document.getElementById('filter-cat').value;
+  const month = document.getElementById('filter-month').value;
+  const search = document.getElementById('filter-search').value.toLowerCase();
+
+  let filtered = allTransactions.filter(t => {
+    if (type && t.type !== type) return false;
+    if (cat && t.category !== cat) return false;
+    if (month && !t.date.startsWith(month)) return false;
+    if (search && !t.title.toLowerCase().includes(search) && !t.note.toLowerCase().includes(search)) return false;
+    return true;
+  });
+
+  renderTransactions(filtered);
+}
+
+function renderTransactions(txs) {
+  const tbody = document.getElementById('tx-body');
+  let income = 0, expense = 0;
+  txs.forEach(t => { if (t.type === 'income') income += t.amount; else expense += t.amount; });
+  document.getElementById('sum-income').textContent = formatINR(income);
+  document.getElementById('sum-expense').textContent = formatINR(expense);
+  const net = income - expense;
+  const netEl = document.getElementById('sum-net');
+  netEl.textContent = (net >= 0 ? '+' : '-') + formatINR(Math.abs(net));
+  netEl.className = net >= 0 ? 'value amount-income' : 'value amount-expense';
+  document.getElementById('sum-count').textContent = txs.length;
+
+  if (txs.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;color:#6b7280;padding:36px;">No transactions found.</td></tr>';
+    return;
+  }
+
+  tbody.innerHTML = txs.map(t => `
+    <tr>
+      <td>
+        <div style="font-weight:700;color:var(--text-primary);">${t.title}</div>
+      </td>
+      <td>
+        <span class="chip">
+          <span style="display:flex;align-items:center;justify-content:center;color:${t.category_color}">
+            <i data-lucide="${t.category_icon || 'package'}" style="width:14px;height:14px;"></i>
+          </span>
+          <span style="margin-left:4px;">${t.category}</span>
+        </span>
+      </td>
+      <td style="color:var(--text-secondary);font-size:13px;">${new Date(t.date + 'T00:00:00').toLocaleDateString('en-IN', {day:'2-digit',month:'short',year:'numeric'})}</td>
+      <td style="color:var(--text-muted);font-size:12px;">${t.note || '—'}</td>
+      <td style="text-align:right;" class="${t.type === 'income' ? 'amount-income' : 'amount-expense'}">
+        ${t.type === 'income' ? '+' : '-'}${formatINR(t.amount)}
+      </td>
+      <td style="text-align:right;">
+        <div style="display:flex;gap:8px;justify-content:flex-end;">
+          <button onclick='openEditModal(${JSON.stringify(t)})' class="btn btn-ghost btn-action">
+            <i data-lucide="edit-3" style="width: 12px; height: 12px;"></i> Edit
+          </button>
+          <button onclick="confirmDelete(${t.id})" class="btn btn-danger btn-action">
+            <i data-lucide="trash-2" style="width: 12px; height: 12px;"></i> Delete
+          </button>
+        </div>
+      </td>
+    </tr>
+  `).join('');
+  
+  // Reinitialize Lucide vector icons
+  lucide.createIcons();
+}
+
+async function loadTransactions() {
+  allTransactions = await api('/api/transactions');
+  loadCatsForType(currentType);
+  filterTransactions();
+}
+
+loadTransactions();
+</script>
+{% endblock %}
