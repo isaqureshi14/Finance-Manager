@@ -143,7 +143,7 @@
     </div>
     <div style="position:relative; height:200px;">
       <canvas id="category-chart" height="200"></canvas>
-      <div style="position:absolute; top:52%; left:50%; transform:translate(-50%, -50%); text-align:center; pointer-events:none;">
+      <div id="doughnut-center-val-container" style="position:absolute; top:50%; left:50%; transform:translate(-50%, -50%); text-align:center; pointer-events:none;">
         <div style="font-size:9px; font-weight:800; text-transform:uppercase; color:var(--text-muted); letter-spacing:1px;">Spent</div>
         <div style="font-size:15px; font-weight:800; font-family:'JetBrains Mono',monospace; color:var(--text-primary); margin-top:2px;" id="doughnut-center-val">₹0</div>
       </div>
@@ -428,7 +428,20 @@ async function loadDashboard() {
           borderWidth: 1
         }
       }
-    }
+    },
+    plugins: [{
+      id: 'doughnutCenterText',
+      afterDraw(chart) {
+        const centerEl = document.getElementById('doughnut-center-val-container');
+        if (centerEl && chart.chartArea) {
+          const x = (chart.chartArea.left + chart.chartArea.right) / 2;
+          const y = (chart.chartArea.top + chart.chartArea.bottom) / 2;
+          centerEl.style.left = `${x}px`;
+          centerEl.style.top = `${y}px`;
+          centerEl.style.transform = 'translate(-50%, -50%)';
+        }
+      }
+    }]
   });
 }
 
